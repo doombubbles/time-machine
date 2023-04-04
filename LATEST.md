@@ -1,1 +1,1 @@
-- Initial Release
+- Fixed for BTD6 v36

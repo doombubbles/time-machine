@@ -5,7 +5,8 @@
 
 <h1 align="center">Time Machine</h1>
 
-Stores backups as you play, allowing you to travel back in time to any previous round you passed (even if you just lost!)
+Stores backups as you play, allowing you to travel back in time to any previous round you passed (even if you just
+lost!)
 
 ![Screenshot of Time Machine UI](Screenshot.png)
 

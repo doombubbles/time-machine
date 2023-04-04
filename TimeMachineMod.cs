@@ -13,7 +13,6 @@ using Il2CppAssets.Scripts.Data.Boss;
 using Il2CppAssets.Scripts.Models.Profile;
 using Il2CppAssets.Scripts.Models.ServerEvents;
 using Il2CppAssets.Scripts.Unity;
-using Il2CppAssets.Scripts.Unity.Bridge;
 using Il2CppAssets.Scripts.Unity.UI_New;
 using Il2CppAssets.Scripts.Unity.UI_New.InGame;
 using Il2CppAssets.Scripts.Unity.UI_New.Popups;
@@ -117,7 +116,8 @@ public class TimeMachineMod : BloonsTD6Mod
         foreach (var directoryInfo in folder.GetDirectories().ToList()
                      .Where(directoryInfo => !usedGameIds.Contains(directoryInfo.Name)))
         {
-            ModHelper.Msg<TimeMachineMod>($"Deleting Time Machine saves for game {directoryInfo.Name} since it was removed from profile");
+            ModHelper.Msg<TimeMachineMod>(
+                $"Deleting Time Machine saves for game {directoryInfo.Name} since it was removed from profile");
             try
             {
                 directoryInfo.Delete(true);
@@ -191,9 +191,8 @@ public class TimeMachineMod : BloonsTD6Mod
                     mode = saveModel.modeName
                 });
         }
-        
+
         UI.instance.LoadGame(null, null, saveModel);
-        InGameData.CurrentGame.gameType = GameType.BossBloon;
         Game.instance.playerService.Player.Data.SetSavedMap(saveModel.savedMapsId, saveModel);
     }
 
