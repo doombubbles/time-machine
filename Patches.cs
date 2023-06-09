@@ -34,11 +34,11 @@ internal static class InGame_RoundEnd
 /// <summary>
 /// Hijack returning to the main menu when there's a save we're trying to load
 /// </summary>
-[HarmonyPatch(typeof(InGame._ReturnToMainMenu_d__193), nameof(InGame._ReturnToMainMenu_d__193.MoveNext))]
+[HarmonyPatch(typeof(InGame._ReturnToMainMenu_d__194), nameof(InGame._ReturnToMainMenu_d__194.MoveNext))]
 internal static class InGame_ReturnToMainMenu
 {
     [HarmonyPrefix]
-    private static void Prefix(InGame._ReturnToMainMenu_d__193 __instance)
+    private static void Prefix(InGame._ReturnToMainMenu_d__194 __instance)
     {
         // ModHelper.Msg<TimeMachineMod>(__instance.__1__state);
         if (__instance.__1__state == 4 && TimeMachineMod.MapSave != null)

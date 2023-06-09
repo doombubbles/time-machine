@@ -1,1 +1,1 @@
-- Fixed for BTD6 v36
+- Fixed for BTD6 v37

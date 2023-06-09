@@ -189,7 +189,7 @@ public class TimeMachineMod : BloonsTD6Mod
                     difficulty = saveModel.mapDifficulty,
                     map = saveModel.mapName,
                     mode = saveModel.modeName
-                });
+                }, LeaderboardScoringType.GameTime);
         }
 
         UI.instance.LoadGame(null, null, saveModel);
@@ -250,7 +250,7 @@ public class TimeMachineMod : BloonsTD6Mod
                 )
             );
 
-            btn.AddText(new Info("Text", InfoPreset.FillParent), round.ToString(), 100);
+            btn.AddText(new Info("Text", InfoPreset.FillParent) {Width = 50}, round.ToString(), 100);
         }
 
         var progress = InGame.instance.UnityToSimulation.GetCurrentRound() / (float) rounds.Max();
