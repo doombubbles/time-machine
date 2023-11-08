@@ -100,6 +100,10 @@ public class TimeMachineMod : BloonsTD6Mod
     /// </summary>
     public override void OnMainMenu()
     {
+        var folder = new DirectoryInfo(SavesFolder);
+
+        if (!folder.Exists || MapSave != null) return;
+
         var allSavedMaps = Game.instance.playerService.Player.Data.AllSavedMaps;
 
         var usedGameIds = new HashSet<string>();
@@ -108,11 +112,6 @@ public class TimeMachineMod : BloonsTD6Mod
         {
             usedGameIds.Add(JsonConvert.SerializeObject(mapSave.gameId));
         }
-
-        var folder = new DirectoryInfo(SavesFolder);
-
-        if (!folder.Exists) return;
-
         foreach (var directoryInfo in folder.GetDirectories().ToList()
                      .Where(directoryInfo => !usedGameIds.Contains(directoryInfo.Name)))
         {
