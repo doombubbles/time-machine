@@ -1,1 +1,1 @@
-- Fixed saves being able to ever be deleted while you were still in a game, in this case a Boss match
+- Fixed for BTD6 v40

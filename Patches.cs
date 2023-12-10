@@ -7,7 +7,10 @@ using HarmonyLib;
 using Il2CppAssets.Scripts.Unity.Bridge;
 using Il2CppAssets.Scripts.Unity.UI_New.GameOver;
 using Il2CppAssets.Scripts.Unity.UI_New.InGame;
+using Il2CppAssets.Scripts.Unity.UI_New.Main;
 using Il2CppAssets.Scripts.Unity.UI_New.Pause;
+using Il2CppSystem;
+using BindingFlags = Il2CppSystem.Reflection.BindingFlags;
 
 namespace TimeMachine;
 
@@ -37,14 +40,22 @@ internal static class InGame_RoundEnd
 /// <summary>
 /// Hijack returning to the main menu when there's a save we're trying to load
 /// </summary>
-[HarmonyPatch(typeof(InGame._ReturnToMainMenu_d__207), nameof(InGame._ReturnToMainMenu_d__207.MoveNext))]
+[HarmonyPatch]
 internal static class InGame_ReturnToMainMenu
 {
-    [HarmonyPrefix]
-    private static void Prefix(InGame._ReturnToMainMenu_d__207 __instance)
+    private static IEnumerable<MethodBase> TargetMethods()
     {
-        // ModHelper.Msg<TimeMachineMod>(__instance.__1__state);
-        if (__instance.__1__state == 4 && TimeMachineMod.MapSave != null)
+        yield return MoreAccessTools.SafeGetNestedClassMethod(typeof(InGame), nameof(InGame.ReturnToMainMenu));
+    }
+
+    [HarmonyPrefix]
+    private static void Prefix(Object __instance)
+    {
+        var state = __instance.GetIl2CppType()
+            .GetField("<>1__state", BindingFlags.Instance | BindingFlags.NonPublic)
+            .GetValue(__instance)
+            .Unbox<int>();
+        if (state == 4 && TimeMachineMod.MapSave != null)
         {
             TimeMachineMod.LoadSave(TimeMachineMod.MapSave);
         }
