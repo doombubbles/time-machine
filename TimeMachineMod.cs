@@ -13,7 +13,9 @@ using Il2CppAssets.Scripts.Data.Boss;
 using Il2CppAssets.Scripts.Models.Profile;
 using Il2CppAssets.Scripts.Models.ServerEvents;
 using Il2CppAssets.Scripts.Unity;
+using Il2CppAssets.Scripts.Unity.Bridge;
 using Il2CppAssets.Scripts.Unity.UI_New;
+using Il2CppAssets.Scripts.Unity.UI_New.DailyChallenge;
 using Il2CppAssets.Scripts.Unity.UI_New.InGame;
 using Il2CppAssets.Scripts.Unity.UI_New.Popups;
 using Il2CppNewtonsoft.Json;
@@ -26,6 +28,7 @@ using File = System.IO.File;
 using Path = System.IO.Path;
 using SearchOption = System.IO.SearchOption;
 using TaskScheduler = BTD_Mod_Helper.Api.TaskScheduler;
+
 [assembly: MelonInfo(typeof(TimeMachineMod), ModHelperData.Name, ModHelperData.Version, ModHelperData.RepoOwner)]
 [assembly: MelonGame("Ninja Kiwi", "BloonsTD6")]
 
@@ -61,6 +64,7 @@ public class TimeMachineMod : BloonsTD6Mod
 
     public static string SavesFolder => Path.Combine(FileIOHelper.sandboxRoot, SavesFolderName);
     public static MapSaveDataModel? MapSave { get; private set; }
+    public static ReadonlyInGameData? LastInGameData { get; set; }
 
     public static void CalcSize(ModHelperOption? option = null)
     {
@@ -112,6 +116,7 @@ public class TimeMachineMod : BloonsTD6Mod
         {
             usedGameIds.Add(JsonConvert.SerializeObject(mapSave.gameId));
         }
+
         foreach (var directoryInfo in folder.GetDirectories().ToList()
                      .Where(directoryInfo => !usedGameIds.Contains(directoryInfo.Name)))
         {
@@ -189,6 +194,13 @@ public class TimeMachineMod : BloonsTD6Mod
                     map = saveModel.mapName,
                     mode = saveModel.modeName
                 }, LeaderboardScoringType.GameTime);
+        }
+
+        if (saveModel.gameType is GameType.BossBloon or GameType.BossChallenge && LastInGameData != null)
+        {
+            var bossData = LastInGameData.bossData;
+            inGameData.SetupBoss(saveModel.dailyChallengeEventID, bossData.bossBloon, bossData.bossEliteMode,
+                bossData.bossRankedMode, bossData.spawnRounds, LastInGameData.dcModel, LastInGameData.scoringType);
         }
 
         UI.instance.LoadGame(null, null, saveModel);

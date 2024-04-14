@@ -55,7 +55,15 @@ internal static class InGame_ReturnToMainMenu
             .GetField("<>1__state", BindingFlags.Instance | BindingFlags.NonPublic)
             .GetValue(__instance)
             .Unbox<int>();
-        if (state == 5 && TimeMachineMod.MapSave != null)
+
+        if (state == 0)
+        {
+            TimeMachineMod.LastInGameData = InGameData.CurrentGame;
+        }
+
+        if (TimeMachineMod.MapSave == null) return;
+
+        if (state == 5)
         {
             TimeMachineMod.LoadSave(TimeMachineMod.MapSave);
         }
