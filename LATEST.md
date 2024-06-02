@@ -1,2 +1,1 @@
-- Fixed for BTD6 v42
-- Fixed for Boss Event saves and Boss Challenge saves
+- Fixed for BTD6 v43

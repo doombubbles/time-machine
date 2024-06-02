@@ -242,7 +242,7 @@ public class TimeMachineMod : BloonsTD6Mod
         );
 
 
-        var currentRound = InGame.instance.UnityToSimulation.GetCurrentRound();
+        var currentRound = InGame.instance.bridge.GetCurrentRound();
 
         foreach (var round in rounds)
         {
@@ -264,7 +264,7 @@ public class TimeMachineMod : BloonsTD6Mod
             btn.AddText(new Info("Text", InfoPreset.FillParent) {Width = 50}, round.ToString(), 100);
         }
 
-        var progress = InGame.instance.UnityToSimulation.GetCurrentRound() / (float) rounds.Max();
+        var progress = InGame.instance.bridge.GetCurrentRound() / (float) rounds.Max();
         mainScroll.ScrollRect.horizontalNormalizedPosition = Math.Clamp(progress, 0, 1);
     }
 }
