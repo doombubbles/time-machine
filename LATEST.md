@@ -1,1 +1,3 @@
-- Fixed for BTD6 v43
+- Now loads saves faster
+- Fixed to also work for Daily Challenges / Challenge Editor
+- Fixed to also work on Custom Maps from the Content Browser / Map Editor

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
@@ -13,19 +12,24 @@ using Il2CppAssets.Scripts.Data.Boss;
 using Il2CppAssets.Scripts.Models.Profile;
 using Il2CppAssets.Scripts.Models.ServerEvents;
 using Il2CppAssets.Scripts.Unity;
-using Il2CppAssets.Scripts.Unity.Bridge;
-using Il2CppAssets.Scripts.Unity.UI_New;
-using Il2CppAssets.Scripts.Unity.UI_New.DailyChallenge;
+using Il2CppAssets.Scripts.Unity.Menu;
 using Il2CppAssets.Scripts.Unity.UI_New.InGame;
 using Il2CppAssets.Scripts.Unity.UI_New.Popups;
+using Il2CppAssets.Scripts.Utils;
 using Il2CppNewtonsoft.Json;
+using Il2CppNinjaKiwi.Common;
+using Il2CppNinjaKiwi.GUTS.Models.ContentBrowser;
+using Il2CppNinjaKiwi.LiNK.DotNetZip.Zlib;
+using Il2CppSystem.IO;
 using MelonLoader;
 using TimeMachine;
 using UnityEngine;
+using static Il2CppAssets.Scripts.Models.ServerEvents.ChallengeType;
 using Directory = System.IO.Directory;
 using DirectoryInfo = System.IO.DirectoryInfo;
 using File = System.IO.File;
 using Path = System.IO.Path;
+using FileInfo = System.IO.FileInfo;
 using SearchOption = System.IO.SearchOption;
 using TaskScheduler = BTD_Mod_Helper.Api.TaskScheduler;
 
@@ -36,8 +40,6 @@ namespace TimeMachine;
 
 public class TimeMachineMod : BloonsTD6Mod
 {
-    public const string SavesFolderName = "TimeMachineSaves";
-
     public static readonly ModSettingButton OpenSavesFolder = new(() => Process.Start(new ProcessStartInfo
     {
         FileName = SavesFolder,
@@ -62,9 +64,18 @@ public class TimeMachineMod : BloonsTD6Mod
 
     private static ModHelperOption? deleteOption;
 
-    public static string SavesFolder => Path.Combine(FileIOHelper.sandboxRoot, SavesFolderName);
-    public static MapSaveDataModel? MapSave { get; private set; }
-    public static ReadonlyInGameData? LastInGameData { get; set; }
+    public const string SavesFolderName = "TimeMachineSaves";
+
+    public static string OldSavesFolder => Path.Combine(FileIOHelper.sandboxRoot, SavesFolderName);
+
+    public static string SavesFolder =>
+        Path.Combine(Game.instance.playerService.Configuration.PlayerDataRootPath, SavesFolderName,
+            Game.Player.Data.ownerID ?? "");
+
+    internal static readonly JsonSerializerSettings Settings = new()
+    {
+        TypeNameHandling = TypeNameHandling.Objects,
+    };
 
     public static void CalcSize(ModHelperOption? option = null)
     {
@@ -106,16 +117,22 @@ public class TimeMachineMod : BloonsTD6Mod
     {
         var folder = new DirectoryInfo(SavesFolder);
 
-        if (!folder.Exists || MapSave != null) return;
-
-        var allSavedMaps = Game.instance.playerService.Player.Data.AllSavedMaps;
-
-        var usedGameIds = new HashSet<string>();
-
-        foreach (var (_, mapSave) in allSavedMaps)
+        if (!folder.Exists && Directory.Exists(OldSavesFolder))
         {
-            usedGameIds.Add(JsonConvert.SerializeObject(mapSave.gameId));
+            folder.Parent!.Create();
+            Directory.Move(OldSavesFolder, SavesFolder);
         }
+
+        if (!folder.Exists || (Game.Player.OnlineData == null && !string.IsNullOrEmpty(Game.Player.Data.ownerID)))
+            return;
+
+        var allSavedMaps = Game.Player.Data.AllSavedMaps.GetValues().ToArray().OfIl2CppType<MapSaveDataModel>();
+
+        var onlineSaves = Game.Player.OnlineData?.contentBrowserData[ContentType.Map].saveData.ToArray()
+            .OfIl2CppType<MapSaveDataModel>();
+
+        var usedGameIds = allSavedMaps.Concat(onlineSaves ?? Array.Empty<MapSaveDataModel>())
+            .Select(mapSave => JsonConvert.SerializeObject(mapSave.gameId));
 
         foreach (var directoryInfo in folder.GetDirectories().ToList()
                      .Where(directoryInfo => !usedGameIds.Contains(directoryInfo.Name)))
@@ -134,6 +151,22 @@ public class TimeMachineMod : BloonsTD6Mod
     }
 
     /// <summary>
+    /// Save the state for the InGame at the given round
+    /// </summary>
+    /// <param name="completedRound"></param>
+    /// <param name="highestCompletedRound"></param>
+    public static void SaveRound(int completedRound, int highestCompletedRound)
+    {
+        var path = FilePathFor(CurrentTimeMachineID, completedRound + 1);
+        var saveModel = InGame.instance.CreateCurrentMapSave(highestCompletedRound, InGame.instance.MapDataSaveId);
+        var text = JsonConvert.SerializeObject(saveModel, Settings);
+        var bytes = ZlibStream.CompressString(text);
+
+        Directory.CreateDirectory(new FileInfo(path).DirectoryName!);
+        File.WriteAllBytes(path, bytes);
+    }
+
+    /// <summary>
     /// Load up the save state for the InGame at the given round
     /// </summary>
     /// <param name="round"></param>
@@ -141,74 +174,54 @@ public class TimeMachineMod : BloonsTD6Mod
     {
         if (InGame.instance == null) return;
 
-        if (round <= 1)
+        var file = FilePathFor(CurrentTimeMachineID, round);
+
+        string text;
+
+        if (File.Exists(file))
         {
-            InGame.instance.Restart();
-            return;
+            var bytes = File.ReadAllBytes(file);
+            text = ZlibStream.UncompressString(bytes);
         }
-
-        var gameId = InGame.instance.GameId;
-
-        var file = FileNameFor(gameId, round);
-
-        if (File.Exists(Path.Combine(FileIOHelper.sandboxRoot, file)))
+        else if (File.Exists(file + ".json"))
         {
-            var saveModel = FileIOHelper.LoadObject<MapSaveDataModel>(file);
-            LoadSave(saveModel);
+            text = File.ReadAllText(file);
         }
         else
         {
-            ModHelper.Warning<TimeMachineMod>($"No Time Machine data for {gameId}/{InGame.instance.currentRoundId}");
+            ModHelper.Warning<TimeMachineMod>($"No Time Machine data for {file}");
+            return;
         }
+
+        var saveModel = JsonConvert.DeserializeObject<MapSaveDataModel>(text, Settings);
+
+        LoadSave(saveModel);
     }
 
     /// <summary>
-    /// Load up SaveModel, works while InGame or not
+    /// Load up SaveModel
     /// </summary>
     /// <param name="saveModel"></param>
     public static void LoadSave(MapSaveDataModel saveModel)
     {
-        if (InGame.instance != null)
+        if (InGameData.CurrentGame?.dcModel?.chalType is UserPlay or CustomMapPlay &&
+            saveModel.gameVersion != Game.Version.ToString())
         {
-            MapSave = saveModel;
-            InGame.instance.Quit();
+            PopupScreen.instance.SafelyQueue(screen =>
+                screen.ShowOkPopup("Can't load save from an older BTD6 version for a Custom Map"));
             return;
         }
 
-        MapSave = null;
-        var inGameData = InGameData.Editable;
-        inGameData.selectedMode = saveModel.modeName;
-        inGameData.selectedMap = saveModel.mapName;
-        inGameData.gameType = saveModel.gameType;
-        inGameData.selectedDifficulty = saveModel.mapDifficulty;
+        InGame.Bridge.ExecuteContinueFromCheckpoint(InGame.Bridge.MyPlayerNumber, new KonFuze(), ref saveModel,
+            true, false);
 
-        if (saveModel.metaData.ContainsKey("BossRounds-BossType") &&
-            saveModel.metaData.ContainsKey("BossRounds-IsElite") &&
-            Enum.TryParse(saveModel.metaData["BossRounds-BossType"], out BossType bossType) &&
-            bool.TryParse(saveModel.metaData["BossRounds-IsElite"], out var isElite))
-        {
-            inGameData.SetupBoss("BossRoundsMod", bossType, isElite, false,
-                BossGameData.DefaultSpawnRounds, new DailyChallengeModel
-                {
-                    difficulty = saveModel.mapDifficulty,
-                    map = saveModel.mapName,
-                    mode = saveModel.modeName
-                }, LeaderboardScoringType.GameTime);
-        }
-
-        if (saveModel.gameType is GameType.BossBloon or GameType.BossChallenge && LastInGameData != null)
-        {
-            var bossData = LastInGameData.bossData;
-            inGameData.SetupBoss(saveModel.dailyChallengeEventID, bossData.bossBloon, bossData.bossEliteMode,
-                bossData.bossRankedMode, bossData.spawnRounds, LastInGameData.dcModel, LastInGameData.scoringType);
-        }
-
-        UI.instance.LoadGame(null, null, saveModel);
-        Game.instance.playerService.Player.Data.SetSavedMap(saveModel.savedMapsId, saveModel);
+        Game.Player.Data.SetSavedMap(saveModel.savedMapsId, saveModel);
     }
 
-    public static string FileNameFor(int gameId, int round) =>
-        Path.Combine(SavesFolderName, gameId.ToString(), round + ".json");
+    public static string CurrentTimeMachineID => InGame.instance.GameId.ToString();
+
+    public static string FilePathFor(string gameId, int round) =>
+        Path.Combine(SavesFolder, gameId, round.ToString());
 
     /// <summary>
     /// Creates the timeline UI bar on a screen
@@ -217,8 +230,7 @@ public class TimeMachineMod : BloonsTD6Mod
     /// <param name="yOffset"></param>
     public static void CreateTimelineUI(GameObject mainPanel, int yOffset = 0)
     {
-        var gameId = InGame.instance.GameId;
-        var folder = new DirectoryInfo(Path.Combine(FileIOHelper.sandboxRoot, SavesFolderName, gameId.ToString()));
+        var folder = new DirectoryInfo(Path.Combine(SavesFolder, CurrentTimeMachineID));
 
         if (!folder.Exists) return;
 
@@ -232,6 +244,7 @@ public class TimeMachineMod : BloonsTD6Mod
         var mainScroll = mainPanel.AddModHelperScrollPanel(
             new Info("TimeMachineScroll", 0, -1150 + yOffset, 2500, 150),
             RectTransform.Axis.Horizontal, VanillaSprites.MainBgPanelHematite, 100);
+
 
         mainPanel.AddModHelperComponent(
             ModHelperImage.Create(new Info("TimeIcon", -1400, -1150 + yOffset, 175), VanillaSprites.StopWatch)
@@ -254,11 +267,14 @@ public class TimeMachineMod : BloonsTD6Mod
 
             var btn = mainScroll.ScrollContent.AddButton(
                 new Info($"Btn{round}", 140), image,
-                new Action(() => PopupScreen.instance.SafelyQueue(screen =>
-                    screen.ShowPopup(PopupScreen.Placement.menuCenter, "Time Machine", message,
-                        new Action(() => LoadRound(round)), "Yes", null, "No",
-                        Popup.TransitionAnim.Scale, PopupScreen.BackGround.Grey))
-                )
+                new Action(() =>
+                {
+                    MenuManager.instance.buttonClick3Sound.Play("ClickSounds");
+                    PopupScreen.instance.SafelyQueue(screen =>
+                        screen.ShowPopup(PopupScreen.Placement.menuCenter, "Time Machine", message,
+                            new Action(() => LoadRound(round)), "Yes", null, "No",
+                            Popup.TransitionAnim.Scale, PopupScreen.BackGround.Grey));
+                })
             );
 
             btn.AddText(new Info("Text", InfoPreset.FillParent) {Width = 50}, round.ToString(), 100);
