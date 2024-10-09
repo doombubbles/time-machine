@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using BTD_Mod_Helper;
 using BTD_Mod_Helper.Api.Components;
@@ -19,7 +21,6 @@ using Il2CppAssets.Scripts.Utils;
 using Il2CppNewtonsoft.Json;
 using Il2CppNinjaKiwi.Common;
 using Il2CppNinjaKiwi.GUTS.Models.ContentBrowser;
-using Il2CppNinjaKiwi.LiNK.DotNetZip.Zlib;
 using Il2CppSystem.IO;
 using MelonLoader;
 using TimeMachine;
@@ -30,6 +31,7 @@ using DirectoryInfo = System.IO.DirectoryInfo;
 using File = System.IO.File;
 using Path = System.IO.Path;
 using FileInfo = System.IO.FileInfo;
+using MemoryStream = System.IO.MemoryStream;
 using SearchOption = System.IO.SearchOption;
 using TaskScheduler = BTD_Mod_Helper.Api.TaskScheduler;
 
@@ -69,7 +71,7 @@ public class TimeMachineMod : BloonsTD6Mod
     public static string OldSavesFolder => Path.Combine(FileIOHelper.sandboxRoot, SavesFolderName);
 
     public static string SavesFolder =>
-        Path.Combine(Game.instance.playerService.Configuration.PlayerDataRootPath, SavesFolderName,
+        Path.Combine(Game.instance.playerService.configuration.playerDataRootPath, SavesFolderName,
             Game.Player.Data.ownerID ?? "");
 
     internal static readonly JsonSerializerSettings Settings = new()
@@ -160,10 +162,14 @@ public class TimeMachineMod : BloonsTD6Mod
         var path = FilePathFor(CurrentTimeMachineID, completedRound + 1);
         var saveModel = InGame.instance.CreateCurrentMapSave(highestCompletedRound, InGame.instance.MapDataSaveId);
         var text = JsonConvert.SerializeObject(saveModel, Settings);
-        var bytes = ZlibStream.CompressString(text);
+        var bytes = Encoding.UTF8.GetBytes(text);
+        
+        using var outputStream = new MemoryStream(bytes);
+        using var zlibStream = new ZLibStream(outputStream, CompressionMode.Compress);
+        zlibStream.Write(bytes, 0, bytes.Length);
 
         Directory.CreateDirectory(new FileInfo(path).DirectoryName!);
-        File.WriteAllBytes(path, bytes);
+        File.WriteAllBytes(path, outputStream.ToArray());
     }
 
     /// <summary>
@@ -181,11 +187,15 @@ public class TimeMachineMod : BloonsTD6Mod
         if (File.Exists(file))
         {
             var bytes = File.ReadAllBytes(file);
-            text = ZlibStream.UncompressString(bytes);
+            using var outputStream = new MemoryStream(bytes);
+            using var zlibStream = new ZLibStream(outputStream, CompressionMode.Decompress);
+            zlibStream.CopyTo(outputStream);
+            
+            text =  Encoding.UTF8.GetString(outputStream.ToArray());
         }
         else if (File.Exists(file + ".json"))
         {
-            text = File.ReadAllText(file);
+            text = File.ReadAllText(file + ".json");
         }
         else
         {
