@@ -165,8 +165,10 @@ public class TimeMachineMod : BloonsTD6Mod
         var bytes = Encoding.UTF8.GetBytes(text);
         
         using var outputStream = new MemoryStream(bytes);
-        using var zlibStream = new ZLibStream(outputStream, CompressionMode.Compress);
-        zlibStream.Write(bytes, 0, bytes.Length);
+        using (var zlibStream = new ZLibStream(outputStream, CompressionMode.Compress))
+        {
+            zlibStream.Write(bytes, 0, bytes.Length);
+        }
 
         Directory.CreateDirectory(new FileInfo(path).DirectoryName!);
         File.WriteAllBytes(path, outputStream.ToArray());
@@ -187,11 +189,13 @@ public class TimeMachineMod : BloonsTD6Mod
         if (File.Exists(file))
         {
             var bytes = File.ReadAllBytes(file);
-            using var outputStream = new MemoryStream(bytes);
-            using var zlibStream = new ZLibStream(outputStream, CompressionMode.Decompress);
-            zlibStream.CopyTo(outputStream);
-            
-            text =  Encoding.UTF8.GetString(outputStream.ToArray());
+            using var inputStream = new MemoryStream(bytes);
+            using var outputStream = new MemoryStream();
+            using (var zlibStream = new ZLibStream(inputStream, CompressionMode.Decompress))
+            {
+                zlibStream.CopyTo(outputStream);
+            }
+            text = Encoding.UTF8.GetString(outputStream.ToArray());
         }
         else if (File.Exists(file + ".json"))
         {

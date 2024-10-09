@@ -1,1 +1,1 @@
-- Fixed for BTD6 v45
+- Fixed compression issue with newly created saves
