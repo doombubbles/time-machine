@@ -1,1 +1,2 @@
-- Fixed compression issue with newly created saves
+- Fixed bugged interactions with Artifacts and rogue party when restoring saves within Rogue Legends
+- Timelines UI shows up on Rogue defeat screen (but at that point you will have lost the life already)

@@ -11,11 +11,14 @@ using BTD_Mod_Helper.Api.Helpers;
 using BTD_Mod_Helper.Api.ModOptions;
 using BTD_Mod_Helper.Extensions;
 using Il2CppAssets.Scripts.Data.Boss;
+using Il2CppAssets.Scripts.Models;
 using Il2CppAssets.Scripts.Models.Profile;
 using Il2CppAssets.Scripts.Models.ServerEvents;
 using Il2CppAssets.Scripts.Unity;
 using Il2CppAssets.Scripts.Unity.Menu;
 using Il2CppAssets.Scripts.Unity.UI_New.InGame;
+using Il2CppAssets.Scripts.Unity.UI_New.InGame.RightMenu;
+using Il2CppAssets.Scripts.Unity.UI_New.Legends;
 using Il2CppAssets.Scripts.Unity.UI_New.Popups;
 using Il2CppAssets.Scripts.Utils;
 using Il2CppNewtonsoft.Json;
@@ -125,7 +128,7 @@ public class TimeMachineMod : BloonsTD6Mod
             Directory.Move(OldSavesFolder, SavesFolder);
         }
 
-        if (!folder.Exists || (Game.Player.OnlineData == null && !string.IsNullOrEmpty(Game.Player.Data.ownerID)))
+        if (!folder.Exists || Game.Player.OnlineData == null && !string.IsNullOrEmpty(Game.Player.Data.ownerID))
             return;
 
         var allSavedMaps = Game.Player.Data.AllSavedMaps.GetValues().ToArray().OfIl2CppType<MapSaveDataModel>();
@@ -163,7 +166,7 @@ public class TimeMachineMod : BloonsTD6Mod
         var saveModel = InGame.instance.CreateCurrentMapSave(highestCompletedRound, InGame.instance.MapDataSaveId);
         var text = JsonConvert.SerializeObject(saveModel, Settings);
         var bytes = Encoding.UTF8.GetBytes(text);
-        
+
         using var outputStream = new MemoryStream(bytes);
         using (var zlibStream = new ZLibStream(outputStream, CompressionMode.Compress))
         {
@@ -228,6 +231,14 @@ public class TimeMachineMod : BloonsTD6Mod
 
         InGame.Bridge.ExecuteContinueFromCheckpoint(InGame.Bridge.MyPlayerNumber, new KonFuze(), ref saveModel,
             true, false);
+        if (InGame.instance.GameType == GameType.Rogue)
+        {
+            ShopMenu.instance.RebuildRogueTowers();
+            foreach (var artifact in InGameData.CurrentGame!.rogueData.equippedArtifacts)
+            {
+                InGame.Bridge.Simulation.artifactManager.Activate(artifact.artifactName);
+            }
+        }
 
         Game.Player.Data.SetSavedMap(saveModel.savedMapsId, saveModel);
     }
