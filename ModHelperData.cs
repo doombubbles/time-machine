@@ -2,8 +2,8 @@ namespace TimeMachine;
 
 public static class ModHelperData
 {
-    public const string WorksOnVersion = "47.0";
-    public const string Version = "1.1.3";
+    public const string WorksOnVersion = "52.0";
+    public const string Version = "1.1.4";
     public const string Name = "Time Machine";
 
     public const string Description =
