@@ -10,6 +10,7 @@ using BTD_Mod_Helper.Api.Enums;
 using BTD_Mod_Helper.Api.Helpers;
 using BTD_Mod_Helper.Api.ModOptions;
 using BTD_Mod_Helper.Extensions;
+using Il2CppAssets.Scripts.Data.Boss;
 using Il2CppAssets.Scripts.Models;
 using Il2CppAssets.Scripts.Models.Profile;
 using Il2CppAssets.Scripts.Unity;
@@ -151,6 +152,34 @@ public class TimeMachineMod : BloonsTD6Mod
     }
 
     /// <summary>
+    /// Allow boss position saving in Frontier boss matches
+    /// </summary>
+    internal static MapSaveDataModel? GetSaveModel(int highestCompletedRound)
+    {
+        var overrideFrontierBossSaving = false;
+        var sim = InGame.Bridge.Simulation;
+        if (sim.model.subGameType == SubGameType.Frontier &&
+            sim.frontierBossManager is { IsBossGame: true })
+        {
+            if (sim.frontierBossManager.frontierGameManagerModel.boss == BossType.Diamondback)
+            {
+                // currently broken for saving and loading
+                return null;
+            }
+
+            overrideFrontierBossSaving = true;
+            sim.model.subGameType = SubGameType.BossBloon;
+        }
+        var saveModel = InGame.instance.CreateCurrentMapSave(highestCompletedRound, InGame.instance.MapDataSaveId);
+        if (overrideFrontierBossSaving)
+        {
+            sim.model.subGameType = SubGameType.Frontier;
+        }
+
+        return saveModel;
+    }
+
+    /// <summary>
     /// Save the state for the InGame at the given round
     /// </summary>
     /// <param name="completedRound"></param>
@@ -158,7 +187,11 @@ public class TimeMachineMod : BloonsTD6Mod
     public static void SaveRound(int completedRound, int highestCompletedRound)
     {
         var path = FilePathFor(CurrentTimeMachineID, completedRound + 1);
-        var saveModel = InGame.instance.CreateCurrentMapSave(highestCompletedRound, InGame.instance.MapDataSaveId);
+
+        var saveModel = GetSaveModel(highestCompletedRound);
+
+        if (saveModel == null) return;
+
         var text = JsonConvert.SerializeObject(saveModel, Settings);
         var bytes = Encoding.UTF8.GetBytes(text);
 
@@ -226,12 +259,29 @@ public class TimeMachineMod : BloonsTD6Mod
 
         InGame.Bridge.ExecuteContinueFromCheckpoint(InGame.Bridge.MyPlayerNumber, new KonFuze(), ref saveModel,
             true, false);
-        if (InGame.instance.GameType == GameType.Rogue)
+        var artifactManager = InGame.Bridge.Simulation.artifactManager;
+        switch (InGame.instance.GameType)
         {
-            ShopMenu.instance.RebuildRogueTowers();
-            foreach (var artifact in InGameData.CurrentGame!.rogueData.equippedArtifacts)
+            case GameType.Rogue:
             {
-                InGame.Bridge.Simulation.artifactManager.Activate(artifact.artifactName);
+                ShopMenu.instance.RebuildRogueTowers();
+                foreach (var artifact in InGameData.CurrentGame!.rogueData.equippedArtifacts)
+                {
+                    if (!artifactManager.IsArtifactActive(artifact.artifactName))
+                    {
+                        artifactManager.Activate(artifact.artifactName);
+                    }
+                }
+                break;
+            }
+            case GameType.Frontier:
+            {
+                ShopMenu.instance.RebuildFrontierTowers();
+                foreach (var artifact in InGameData.CurrentGame!.frontierIngameData.equippedArtifacts)
+                {
+                    artifactManager.Activate(artifact.artifactName, artifact.frontierIds);
+                }
+                break;
             }
         }
 
@@ -297,7 +347,7 @@ public class TimeMachineMod : BloonsTD6Mod
                 })
             );
 
-            btn.AddText(new Info("Text", InfoPreset.FillParent) {Width = 50}, round.ToString(), 100);
+            btn.AddText(new Info("Text", InfoPreset.FillParent) { Width = 50 }, round.ToString(), 100);
         }
 
         var progress = InGame.instance.bridge.GetCurrentRound() / (float) rounds.Max();

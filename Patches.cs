@@ -1,12 +1,21 @@
 ﻿using BTD_Mod_Helper;
+using BTD_Mod_Helper.Extensions;
 using HarmonyLib;
+using Il2CppAssets.Scripts;
 using Il2CppAssets.Scripts.Models;
+using Il2CppAssets.Scripts.Models.Artifacts;
 using Il2CppAssets.Scripts.Models.Profile;
+using Il2CppAssets.Scripts.Models.Towers;
+using Il2CppAssets.Scripts.Simulation;
+using Il2CppAssets.Scripts.Simulation.Artifacts;
 using Il2CppAssets.Scripts.Simulation.Input;
+using Il2CppAssets.Scripts.Simulation.SMath;
+using Il2CppAssets.Scripts.Simulation.Towers;
 using Il2CppAssets.Scripts.Unity;
 using Il2CppAssets.Scripts.Unity.Bridge;
 using Il2CppAssets.Scripts.Unity.UI_New.GameOver;
 using Il2CppAssets.Scripts.Unity.UI_New.InGame;
+using Il2CppAssets.Scripts.Unity.UI_New.InGame.TowerSelectionMenu;
 using Il2CppAssets.Scripts.Unity.UI_New.Legends;
 using Il2CppAssets.Scripts.Unity.UI_New.Pause;
 using Il2CppAssets.Scripts.Utils;
@@ -105,7 +114,7 @@ internal static class RogueInstaInventory_GetSaveMetaData
 }
 
 /// <summary>
-/// Restore saved insta monkey cooldowns
+/// Restore saved rogue insta monkey cooldowns
 /// </summary>
 [HarmonyPatch(typeof(RogueInstaInventory), nameof(RogueInstaInventory.SetSaveMetaData))]
 internal static class RogueInstaInventory_SetSaveMetaData
@@ -120,6 +129,101 @@ internal static class RogueInstaInventory_SetSaveMetaData
             {
                 insta.currentCooldown = cooldown;
             }
+        }
+    }
+}
+
+/// <summary>
+/// Timeline UI for frontier defeat screen
+/// </summary>
+[HarmonyPatch(typeof(FrontierDefeatScreen), nameof(FrontierDefeatScreen.Open))]
+internal static class FrontierDefeatScreen_Open
+{
+    [HarmonyPostfix]
+    private static void Postfix(FrontierDefeatScreen __instance)
+    {
+        TimeMachineMod.CreateTimelineUI(__instance.commonPanel.gameObject, -50);
+    }
+}
+
+/// <summary>
+/// In the real method this happens after the call to base.Initialise, which can cause an error
+/// </summary>
+[HarmonyPatch(typeof(StaminaTraitArtifact), nameof(StaminaTraitArtifact.Initialise))]
+internal static class StaminaTraitArtifact_Initialise
+{
+    [HarmonyPrefix]
+    internal static void Prefix(StaminaTraitArtifact __instance, Model modelToUse)
+    {
+        if (modelToUse.Is(out StaminaTraitArtifactModel staminaTraitArtifactModel))
+        {
+            __instance.staminaTraitArtifactModel = staminaTraitArtifactModel;
+        }
+    }
+}
+
+/// <summary>
+/// Save the data of frontier insta monkey stamina
+/// </summary>
+[HarmonyPatch(typeof(Simulation), nameof(Simulation.GetSaveMetaData))]
+internal static class Simulation_GetSaveMetaData
+{
+    [HarmonyPostfix]
+    internal static void Postfix(Simulation __instance, Dictionary<string, string> metaData)
+    {
+        if (__instance.frontierInstaInventory?.instas == null) return;
+
+        foreach (var insta in __instance.frontierInstaInventory.instas)
+        {
+            metaData["FrontierStamina_" + insta.frontierId] = insta.stamina.ToString();
+        }
+    }
+}
+
+/// <summary>
+/// Restore saved frontier insta monkey stamina
+/// </summary>
+[HarmonyPatch(typeof(Simulation), nameof(Simulation.SetSaveMetaData))]
+internal static class Simulation_SetSaveMetaData
+{
+    [HarmonyPostfix]
+    internal static void Postfix(Simulation __instance, Dictionary<string, string> metaData)
+    {
+        if (__instance.frontierInstaInventory?.instas == null) return;
+
+        foreach (var insta in __instance.frontierInstaInventory.instas)
+        {
+            if (metaData.TryGetValue("FrontierStamina_" + insta.frontierId, out var s) &&
+                float.TryParse(s, out var stamina))
+            {
+                insta.stamina = stamina;
+            }
+        }
+    }
+}
+
+/// <summary>
+/// Prevent incidental error after restoring save in frontier match
+/// </summary>
+[HarmonyPatch(typeof(FrontierTraitsPanel), nameof(FrontierTraitsPanel.UpdateStamina))]
+internal static class FrontierTraitsPanel_UpdateStamina
+{
+    [HarmonyPrefix]
+    internal static bool Prefix(FrontierTraitsPanel __instance) => __instance.insta != null;
+}
+
+/// <summary>
+/// Properly restore frontier Id
+/// </summary>
+[HarmonyPatch(typeof(TowerManager), nameof(TowerManager.CreateTower))]
+internal static class TowerManager_CreateTower
+{
+    [HarmonyPrefix]
+    internal static void Prefix(TowerSaveDataModel? loadingSaveData, ref int frontierId)
+    {
+        if (loadingSaveData is { frontierId: > -1 })
+        {
+            frontierId = loadingSaveData.frontierId;
         }
     }
 }

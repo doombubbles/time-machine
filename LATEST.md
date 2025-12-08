@@ -1,1 +1,3 @@
-- Fixed for v52
+- Improved Time Machine save loading capability for Frontier Legends matches
+  - Traits, Skins, and Stamina states now get correctly saved and loaded
+  - Bosses get correctly saved, apart from Diamondback as NK hasn't set that up properly yet
