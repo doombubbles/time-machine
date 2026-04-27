@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Linq;
@@ -19,8 +20,8 @@ using Il2CppAssets.Scripts.Unity.UI_New.InGame;
 using Il2CppAssets.Scripts.Unity.UI_New.InGame.RightMenu;
 using Il2CppAssets.Scripts.Unity.UI_New.Popups;
 using Il2CppAssets.Scripts.Utils;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using Il2CppNewtonsoft.Json;
-using Il2CppNinjaKiwi.GUTS.Models.ContentBrowser;
 using MelonLoader;
 using TimeMachine;
 using UnityEngine;
@@ -41,6 +42,16 @@ namespace TimeMachine;
 
 public class TimeMachineMod : BloonsTD6Mod
 {
+    public static readonly ModSettingHotkey StepBackwardHotkey = new(KeyCode.LeftArrow, HotkeyModifier.Alt)
+    {
+        description = "Hotkey to load the previous saved round of this match"
+    };
+
+    public static readonly ModSettingHotkey StepForwardHotkey = new(KeyCode.RightArrow, HotkeyModifier.Alt)
+    {
+        description = "Hotkey to load the subsequent saved round of this match"
+    };
+
     public static readonly ModSettingButton OpenSavesFolder = new(() => Process.Start(new ProcessStartInfo
     {
         FileName = SavesFolder,
@@ -129,10 +140,11 @@ public class TimeMachineMod : BloonsTD6Mod
 
         var allSavedMaps = Game.Player.Data.AllSavedMaps.GetValues().ToArray().OfIl2CppType<MapSaveDataModel>();
 
-        var onlineSaves = Game.Player.OnlineData?.contentBrowserData[ContentType.Map].saveData.ToArray()
+        var onlineSaves = Game.Player.OnlineData?.contentBrowserData?.Values()
+            .SelectMany(data => data.saveData?.ToList() ?? [])
             .OfIl2CppType<MapSaveDataModel>();
 
-        var usedGameIds = allSavedMaps.Concat(onlineSaves ?? Array.Empty<MapSaveDataModel>())
+        var usedGameIds = allSavedMaps.Concat(onlineSaves ?? [])
             .Select(mapSave => JsonConvert.SerializeObject(mapSave.gameId));
 
         foreach (var directoryInfo in folder.GetDirectories().ToList()
@@ -148,6 +160,35 @@ public class TimeMachineMod : BloonsTD6Mod
             {
                 ModHelper.Warning<TimeMachineMod>(e);
             }
+        }
+    }
+
+    public override void OnUpdate()
+    {
+        if (!(StepBackwardHotkey.JustPressed() || StepForwardHotkey.JustPressed()) || InGame.instance == null ||
+            InGame.Bridge == null) return;
+
+        var rounds = GetRounds();
+
+        if (!rounds.Any()) return;
+
+        var currentRound = InGame.Bridge.GetCurrentRound();
+        if (InGame.Bridge.AreRoundsActive() && StepBackwardHotkey.JustPressed() && !InGame.instance.IsApopalypse && InGame.Bridge.GetBossBloon() == null)
+        {
+            currentRound++; // go back to start of current round
+        }
+
+        var before = rounds.Where(r => r < currentRound).ToArray();
+        var after = rounds.Where(r => r > currentRound).ToArray();
+
+        if (StepBackwardHotkey.JustPressed() && before.Any())
+        {
+            LoadRound(before.Last());
+        }
+
+        if (StepForwardHotkey.JustPressed() && after.Any())
+        {
+            LoadRound(after.First());
         }
     }
 
@@ -293,6 +334,18 @@ public class TimeMachineMod : BloonsTD6Mod
     public static string FilePathFor(string gameId, int round) =>
         Path.Combine(SavesFolder, gameId, round.ToString());
 
+    public static List<int> GetRounds()
+    {
+        var folder = new DirectoryInfo(Path.Combine(SavesFolder, CurrentTimeMachineID));
+
+        if (!folder.Exists) return [];
+
+        return folder.GetFiles()
+            .Select(fileInfo =>
+                int.TryParse(Path.GetFileNameWithoutExtension(fileInfo.Name), out var round) ? round : 0)
+            .Where(i => i != 0).OrderBy(i => i).ToList();
+    }
+
     /// <summary>
     /// Creates the timeline UI bar on a screen
     /// </summary>
@@ -304,10 +357,7 @@ public class TimeMachineMod : BloonsTD6Mod
 
         if (!folder.Exists) return;
 
-        var rounds = folder.GetFiles()
-            .Select(fileInfo =>
-                int.TryParse(Path.GetFileNameWithoutExtension(fileInfo.Name), out var round) ? round : 0)
-            .Where(i => i != 0).OrderBy(i => i).ToList();
+        var rounds = GetRounds();
 
         if (!rounds.Any()) return;
 
