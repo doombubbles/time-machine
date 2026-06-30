@@ -1,0 +1,31 @@
+[package]
+name = "TimeMachine"
+namespace = "doombubbles"
+description = "Stores backups as you play, allowing you to travel back in time to any previous round you passed (even if you just lost!)"
+websiteUrl = "https://github.com/doombubbles/TimeMachine"
+
+[package.dependencies]
+LavaGang-MelonLoader = "0.7.3"
+doombubbles-Btd6ModHelper = "3.6.5"
+
+[build]
+icon = "./Icon.png"
+readme = "./README.md"
+outdir = "bin"
+
+[[build.copy]]
+source = "./bin/Release/TimeMachine.dll"
+target = "TimeMachine.dll"
+
+[[build.copy]]
+source = "./CHANGELOG.md"
+target = "./CHANGELOG.md"
+
+[[build.copy]]
+source = "./LICENSE"
+target = "./LICENSE"
+
+[publish]
+repository = "https://thunderstore.io"
+communities = ["bloons-td-6"]
+categories = ["mods"]

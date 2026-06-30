@@ -10,5 +10,6 @@ public static class ModHelperData
         "Stores backups as you play, allowing you to travel back in time to any previous round you passed (even if you just lost!)";
 
     public const string RepoOwner = "doombubbles";
-    public const string RepoName = "time-machine";
+    public const string PrevRepoName = "time-machine";
+    public const string RepoName = "TimeMachine";
 }

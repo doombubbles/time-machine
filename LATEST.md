@@ -1,2 +1,0 @@
-- There are now configurable hotkeys for stepping forwards and backwards within the current match's saved rounds (default Alt+LeftArrow / Alt+RightArrow)
-- Fixed Challenge Editor saves being cleared too aggressively
