@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed for BTD6 v56
+
 ## [1.1.6] - 2026-04-27
 
 - There are now configurable hotkeys for stepping forwards and backwards within the current match's saved rounds (default Alt+LeftArrow / Alt+RightArrow)

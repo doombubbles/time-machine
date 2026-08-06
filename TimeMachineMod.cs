@@ -299,7 +299,7 @@ public class TimeMachineMod : BloonsTD6Mod
             return;
         }
 
-        InGame.Bridge.ExecuteContinueFromCheckpoint(InGame.Bridge.MyPlayerNumber, new KonFuze(), ref saveModel,
+        InGame.Bridge.ExecuteContinueFromCheckpoint(InGame.Bridge.GetInputId(), new KonFuze(), ref saveModel,
             true, false);
         var artifactManager = InGame.Bridge.Simulation.artifactManager;
         switch (InGame.instance.GameType)
